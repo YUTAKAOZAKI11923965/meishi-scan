@@ -1,0 +1,14 @@
+{
+  "name": "meishi-scan",
+  "version": "1.0.0",
+  "description": "名刺スキャン送信Webアプリ",
+  "private": true,
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "@sendgrid/mail": "^8.1.0",
+    "@vercel/kv": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

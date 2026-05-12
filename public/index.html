@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>名刺スキャン送信</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --ink: #1a1a2e; --paper: #f5f0e8; --accent: #c0392b;
+      --mid: #7f8c8d; --white: #ffffff; --shadow: rgba(26,26,46,0.15);
+    }
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: var(--paper); color: var(--ink);
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 0 0 40px; overflow-x: hidden;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 30px, rgba(0,0,0,0.015) 30px, rgba(0,0,0,0.015) 31px),
+        repeating-linear-gradient(90deg, transparent, transparent 30px, rgba(0,0,0,0.015) 30px, rgba(0,0,0,0.015) 31px);
+      pointer-events: none; z-index: 0;
+    }
+    header {
+      width: 100%; background: var(--ink); color: var(--paper);
+      text-align: center; padding: 28px 20px 24px; position: relative; z-index: 1;
+    }
+    header::after {
+      content: ''; display: block; width: 40px; height: 3px;
+      background: var(--accent); margin: 12px auto 0;
+    }
+    header h1 { font-family: 'Shippori Mincho', serif; font-size: 1.5rem; font-weight: 600; letter-spacing: 0.15em; }
+    header p { font-size: 0.72rem; color: rgba(245,240,232,0.6); margin-top: 6px; letter-spacing: 0.1em; }
+    .container { width: 100%; max-width: 480px; padding: 32px 20px 0; position: relative; z-index: 1; }
+    .steps { display: flex; align-items: center; justify-content: center; margin-bottom: 32px; }
+    .step { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .step-circle {
+      width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--mid);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 700; color: var(--mid);
+      background: var(--paper); transition: all 0.4s ease;
+    }
+    .step.active .step-circle { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+    .step.done .step-circle { background: var(--accent); border-color: var(--accent); color: var(--white); }
+    .step-label { font-size: 0.62rem; color: var(--mid); letter-spacing: 0.05em; white-space: nowrap; }
+    .step.active .step-label { color: var(--ink); font-weight: 500; }
+    .step.done .step-label { color: var(--accent); }
+    .step-line { width: 48px; height: 1px; background: var(--mid); margin: 0 4px 18px; opacity: 0.4; }
+    .card {
+      background: var(--white); border-radius: 2px;
+      box-shadow: 0 2px 20px var(--shadow), 4px 4px 0 var(--ink);
+      padding: 28px 24px; margin-bottom: 20px; display: none;
+      animation: slideIn 0.35s ease;
+    }
+    .card.active { display: block; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .card-title {
+      font-family: 'Shippori Mincho', serif; font-size: 1.05rem; font-weight: 600;
+      margin-bottom: 18px; display: flex; align-items: center; gap: 10px;
+    }
+    .card-title::before { content: ''; display: inline-block; width: 4px; height: 1.1em; background: var(--accent); border-radius: 2px; }
+    .camera-area {
+      width: 100%; aspect-ratio: 3/2; background: #eee;
+      border: 2px dashed #ccc; border-radius: 2px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      cursor: pointer; transition: border-color 0.2s, background 0.2s; overflow: hidden; position: relative;
+    }
+    .camera-area:hover { border-color: var(--ink); background: #e8e4dc; }
+    .camera-area img { width: 100%; height: 100%; object-fit: cover; display: none; }
+    .camera-area img.visible { display: block; }
+    .camera-placeholder { display: flex; flex-direction: column; align-items: center; gap: 10px; color: var(--mid); }
+    .camera-placeholder svg { width: 48px; height: 48px; opacity: 0.5; }
+    .camera-placeholder span { font-size: 0.8rem; letter-spacing: 0.05em; }
+    input[type="file"] { display: none; }
+    .btn {
+      display: block; width: 100%; padding: 16px; border: none; border-radius: 2px;
+      font-family: 'Noto Sans JP', sans-serif; font-size: 0.9rem; font-weight: 500;
+      letter-spacing: 0.1em; cursor: pointer; transition: all 0.2s; text-align: center;
+    }
+    .btn-primary { background: var(--ink); color: var(--paper); box-shadow: 3px 3px 0 var(--accent); margin-top: 18px; }
+    .btn-primary:hover:not(:disabled) { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--accent); }
+    .btn-primary:active:not(:disabled) { transform: translate(1px,1px); box-shadow: 1px 1px 0 var(--accent); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+    .btn-secondary { background: transparent; color: var(--mid); border: 1px solid #ddd; margin-top: 10px; font-size: 0.8rem; }
+    .btn-secondary:hover { border-color: var(--ink); color: var(--ink); }
+    .ocr-box {
+      background: #f9f7f3; border: 1px solid #e0dbd0; border-radius: 2px;
+      padding: 16px; min-height: 120px; font-size: 0.82rem; line-height: 1.8;
+      color: var(--ink); white-space: pre-wrap; word-break: break-all;
+    }
+    .ocr-processing { display: flex; align-items: center; gap: 10px; color: var(--mid); font-size: 0.8rem; }
+    .spinner { width: 18px; height: 18px; border: 2px solid #ddd; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .success-card { text-align: center; padding: 40px 24px; }
+    .success-icon {
+      width: 64px; height: 64px; background: var(--ink); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px; box-shadow: 3px 3px 0 var(--accent);
+    }
+    .success-icon svg { width: 32px; height: 32px; color: var(--paper); }
+    .success-title { font-family: 'Shippori Mincho', serif; font-size: 1.3rem; font-weight: 600; margin-bottom: 10px; }
+    .success-sub { font-size: 0.8rem; color: var(--mid); line-height: 1.8; }
+    .success-sub strong { color: var(--accent); }
+    .hint { font-size: 0.72rem; color: var(--mid); margin-top: 12px; line-height: 1.7; letter-spacing: 0.03em; }
+    .preview-thumb { width: 100%; aspect-ratio: 3/2; object-fit: cover; border-radius: 2px; border: 1px solid #e0dbd0; margin-bottom: 16px; }
+    .toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--ink); color: var(--paper);
+      padding: 12px 24px; border-radius: 2px; font-size: 0.8rem;
+      letter-spacing: 0.05em; z-index: 100; transition: transform 0.3s ease; white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.error { background: var(--accent); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>名刺スキャン送信</h1>
+  <p>MEISHI SCAN & SEND</p>
+</header>
+
+<div class="container">
+  <div class="steps">
+    <div class="step active" id="s1">
+      <div class="step-circle">1</div>
+      <div class="step-label">撮影</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="s2">
+      <div class="step-circle">2</div>
+      <div class="step-label">確認</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step" id="s3">
+      <div class="step-circle">3</div>
+      <div class="step-label">送信完了</div>
+    </div>
+  </div>
+
+  <!-- Step 1: 撮影 -->
+  <div class="card active" id="card1">
+    <div class="card-title">名刺を撮影してください</div>
+    <div class="camera-area" id="cameraArea" onclick="document.getElementById('fileInput').click()">
+      <div class="camera-placeholder" id="placeholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <span>タップして名刺を撮影</span>
+      </div>
+      <img id="preview" alt="名刺プレビュー" />
+    </div>
+    <input type="file" id="fileInput" accept="image/*" capture="environment" />
+    <p class="hint">※ 名刺全体が収まるように撮影してください。<br>明るい場所での撮影を推奨します。</p>
+    <button class="btn btn-primary" id="nextBtn" disabled onclick="goToStep2()">次へ　→　OCR確認</button>
+  </div>
+
+  <!-- Step 2: 確認・送信 -->
+  <div class="card" id="card2">
+    <div class="card-title">内容を確認して送信</div>
+    <img id="thumbImg" class="preview-thumb" src="" alt="名刺画像" />
+    <div style="margin-bottom:8px; font-size:0.8rem; color:var(--mid); letter-spacing:0.05em;">📄 読み取りテキスト</div>
+    <div class="ocr-box" id="ocrResult">
+      <div class="ocr-processing" id="ocrLoading">
+        <div class="spinner"></div>
+        <span>OCR処理中...</span>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="sendBtn" disabled onclick="sendData()">送信する</button>
+    <button class="btn btn-secondary" onclick="goBack()">← 撮り直す</button>
+  </div>
+
+  <!-- Step 3: 完了 -->
+  <div class="card" id="card3">
+    <div class="success-card">
+      <div class="success-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="success-title">送信が完了しました</div>
+      <p class="success-sub">
+        名刺情報を<br>
+        <strong>info.ozaki@gmail.com</strong><br>
+        へ送信しました。<br><br>
+        ご協力ありがとうございました。
+      </p>
+      <button class="btn btn-primary" style="margin-top:32px" onclick="resetApp()">続けて送信する</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let capturedImageData = null;
+  let ocrText = '';
+
+  document.getElementById('fileInput').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      capturedImageData = ev.target.result;
+      const preview = document.getElementById('preview');
+      preview.src = capturedImageData;
+      preview.classList.add('visible');
+      document.getElementById('placeholder').style.display = 'none';
+      document.getElementById('nextBtn').disabled = false;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function goToStep2() {
+    document.getElementById('s1').classList.replace('active','done');
+    document.getElementById('s2').classList.add('active');
+    document.getElementById('card1').classList.remove('active');
+    document.getElementById('card2').classList.add('active');
+    document.getElementById('thumbImg').src = capturedImageData;
+    runOCR();
+  }
+
+  async function runOCR() {
+    document.getElementById('sendBtn').disabled = true;
+    document.getElementById('ocrLoading').style.display = 'flex';
+    try {
+      const base64Data = capturedImageData.split(',')[1];
+      const mediaType = capturedImageData.split(';')[0].split(':')[1];
+      // OCRのみ先に実行してプレビュー表示
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Data, mediaType })
+      });
+      const data = await response.json();
+      ocrText = data.text || '読み取れませんでした';
+    } catch (err) {
+      ocrText = '（OCR処理に失敗しました。送信はそのまま行えます）';
+    }
+    document.getElementById('ocrLoading').style.display = 'none';
+    const box = document.getElementById('ocrResult');
+    box.innerHTML = '';
+    box.textContent = ocrText;
+    document.getElementById('sendBtn').disabled = false;
+  }
+
+  async function sendData() {
+    const btn = document.getElementById('sendBtn');
+    btn.disabled = true;
+    btn.textContent = '送信中...';
+    try {
+      const base64Data = capturedImageData.split(',')[1];
+      const mediaType = capturedImageData.split(';')[0].split(':')[1];
+      // OCR結果・DB保存・メール送信をまとめて実行
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: base64Data, mediaType, ocrText })
+      });
+      if (!response.ok) throw new Error('送信失敗');
+      const result = await response.json();
+      // 一部失敗でも警告表示して完了扱い
+      if (result.warnings && result.warnings.length > 0) {
+        showToast('一部処理に失敗しましたが送信されました', false);
+      }
+      document.getElementById('s2').classList.replace('active','done');
+      document.getElementById('s3').classList.add('active','done');
+      document.getElementById('card2').classList.remove('active');
+      document.getElementById('card3').classList.add('active');
+    } catch (err) {
+      showToast('送信に失敗しました。再度お試しください。', true);
+      btn.disabled = false;
+      btn.textContent = '送信する';
+    }
+  }
+
+  function goBack() {
+    document.getElementById('s2').classList.remove('active');
+    document.getElementById('s1').classList.remove('done');
+    document.getElementById('s1').classList.add('active');
+    document.getElementById('card2').classList.remove('active');
+    document.getElementById('card1').classList.add('active');
+    capturedImageData = null; ocrText = '';
+    document.getElementById('preview').classList.remove('visible');
+    document.getElementById('placeholder').style.display = 'flex';
+    document.getElementById('nextBtn').disabled = true;
+    document.getElementById('fileInput').value = '';
+  }
+
+  function resetApp() {
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active','done'));
+    document.getElementById('s1').classList.add('active');
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+    document.getElementById('card1').classList.add('active');
+    capturedImageData = null; ocrText = '';
+    document.getElementById('preview').classList.remove('visible');
+    document.getElementById('placeholder').style.display = 'flex';
+    document.getElementById('nextBtn').disabled = true;
+    document.getElementById('fileInput').value = '';
+    document.getElementById('ocrResult').innerHTML = '<div class="ocr-processing" id="ocrLoading" style="display:none"><div class="spinner"></div><span>OCR処理中...</span></div>';
+    document.getElementById('sendBtn').textContent = '送信する';
+  }
+
+  function showToast(msg, isError = false) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.className = 'toast' + (isError ? ' error' : '');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 3000);
+  }
+</script>
+</body>
+</html>
