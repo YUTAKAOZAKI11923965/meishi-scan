@@ -8,9 +8,15 @@ export default async function handler(req, res) {
   const { image, mediaType } = req.body;
   if (!image || !mediaType) return res.status(400).json({ error: "Missing image or mediaType" });
 
+  // 画像サイズチェック（4MB以上は拒否）
+  const sizeInBytes = Buffer.byteLength(image, 'base64');
+  if (sizeInBytes > 4 * 1024 * 1024) {
+    return res.status(400).json({ error: "画像が大きすぎます" });
+  }
+
   try {
     const response = await client.messages.create({
-      model: "claude-opus-4-5",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
       messages: [
         {
@@ -45,8 +51,12 @@ URL：
 
     const text = response.content[0]?.text || "読み取れませんでした";
     return res.status(200).json({ text });
+
   } catch (err) {
-    console.error("OCR error:", err);
-    return res.status(500).json({ error: "OCR処理に失敗しました" });
+    console.error("OCR error:", JSON.stringify(err));
+    return res.status(500).json({ 
+      error: "OCR処理に失敗しました",
+      detail: err.message || "unknown error"
+    });
   }
 }
